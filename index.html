@@ -154,7 +154,29 @@ function createShip(THREE) {
     const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;return t;
   }
   const woodTexture=canvasTexture('wood'), clothTexture=canvasTexture('cloth');
+  // Inline Soundplay.io wordmark: ink on the canvas, so it follows every sail fold.
+  function brandedSailTexture(){
+    const canvas=document.createElement('canvas');canvas.width=1024;canvas.height=512;
+    const ctx=canvas.getContext('2d');ctx.drawImage(clothTexture.image,0,0,1024,512);
+    const logo=document.createElement('canvas');logo.width=1120;logo.height=244;
+    const g=logo.getContext('2d');g.scale(4,4);
+    g.fillStyle='#26113e';g.fillRect(0,0,280,61);
+    // Lime ring, headphones, and the white gamepad emblem from the supplied mark.
+    g.fillStyle='#283c55';g.beginPath();g.arc(31,29,9.3,0,Math.PI*2);g.fill();
+    g.strokeStyle='#b5ff19';g.lineWidth=2.6;g.beginPath();g.arc(31,29,10.1,0,Math.PI*2);g.stroke();
+    g.strokeStyle='#fff';g.lineWidth=1.6;g.beginPath();g.arc(31,28.6,6.9,Math.PI,Math.PI*2);g.stroke();
+    g.fillStyle='#fff';g.beginPath();g.roundRect(24.2,27.8,2.1,5.8,1);g.roundRect(35.7,27.8,2.1,5.8,1);g.fill();
+    g.beginPath();g.moveTo(27.6,25.8);g.bezierCurveTo(29.2,25.2,32.7,25.2,34.4,25.8);g.bezierCurveTo(35.9,27.0,36.6,32.1,35.6,33.2);g.bezierCurveTo(34.7,34.1,33.5,32.8,32.8,31.8);g.lineTo(29.3,31.8);g.bezierCurveTo(28.5,32.8,27.3,34.1,26.4,33.2);g.bezierCurveTo(25.4,32.1,26.1,27.0,27.6,25.8);g.fill();
+    g.fillStyle='#28364d';g.fillRect(27.6,27.7,3.2,1.0);g.fillRect(28.7,26.6,1.0,3.2);
+    for(const [x,y] of [[33.1,27.4],[34.4,29.1]]){g.beginPath();g.arc(x,y,.65,0,Math.PI*2);g.fill()}
+    g.fillStyle='#fff';g.font='700 20px Arial, sans-serif';g.textBaseline='alphabetic';g.fillText('Soundplay.io',59,38);
+    // Compensate for the sail's wide UV aspect so the mark keeps its proportions.
+    ctx.drawImage(logo,92,143,840,253);
+    const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.anisotropy=8;
+    texture.name='Soundplay.io printed sail';return texture;
+  }
   const mat={hull:new THREE.MeshStandardMaterial({color:0x172c30,roughness:.58,metalness:.05}),wood:new THREE.MeshStandardMaterial({color:0xa57237,map:woodTexture,roughness:.58}),deck:new THREE.MeshStandardMaterial({color:0xc29b62,map:woodTexture,roughness:.76}),darkwood:new THREE.MeshStandardMaterial({color:0x674027,map:woodTexture,roughness:.58}),gold:new THREE.MeshStandardMaterial({color:0xc5a25c,roughness:.36,metalness:.35}),black:new THREE.MeshStandardMaterial({color:0x1c2220,roughness:.67}),glass:new THREE.MeshStandardMaterial({color:0x71908a,roughness:.22,metalness:.25}),cloth:new THREE.MeshStandardMaterial({color:0xf3e4c6,map:clothTexture,roughness:.9,side:THREE.DoubleSide}),red:new THREE.MeshStandardMaterial({color:0xa74230,roughness:.8,side:THREE.DoubleSide}),blue:new THREE.MeshStandardMaterial({color:0x1d4057,roughness:.8,side:THREE.DoubleSide})};
+  mat.logoCloth=mat.cloth.clone();mat.logoCloth.name='Soundplay.io sail cloth';mat.logoCloth.map=brandedSailTexture();
   const batches={};for(const name of Object.keys(mat))batches[name]=[];
   const v3=new THREE.Vector3(),q=new THREE.Quaternion(),s=new THREE.Vector3(1,1,1),matrix=new THREE.Matrix4();
   function add(geometry,material,position=[0,0,0],rotation=null,scale=null){const geo=geometry.clone();q.identity();if(rotation)q.setFromEuler(new THREE.Euler(...rotation));matrix.compose(v3.set(...position),q,scale?new THREE.Vector3(...scale):s);geo.applyMatrix4(matrix);batches[material].push(geo);}
@@ -188,15 +210,15 @@ function createShip(THREE) {
   const sailAngle=.95,sailCos=Math.cos(sailAngle),sailSin=Math.sin(sailAngle);
   // Square sails are braced across the wind, opening their canvas toward the viewer.
   function rotateSailPoint(mastX,point){const dx=point[0]-mastX,z=point[2];return [mastX+dx*sailCos+z*sailSin,point[1],z*sailCos-dx*sailSin];}
-  function sail(x,top,height,span){const cols=16,rows=10,p=[],uv=[],idx=[],base=[];for(let j=0;j<=rows;j++)for(let i=0;i<=cols;i++){const u=i/cols,v=j/rows,z=(u-.5)*span*(1-.13*v),y=top-height*v+.035*Math.sin(Math.PI*u)*v,xx=x+.035+.105*Math.sin(Math.PI*u)*Math.sin(Math.PI*v*.88);const pt=rotateSailPoint(x,[xx,y,z]);p.push(...pt);base.push(...pt,u,v);uv.push(u,v);}for(let j=0;j<rows;j++)for(let i=0;i<cols;i++){const a=j*(cols+1)+i;idx.push(a,a+1,a+cols+1,a+1,a+cols+2,a+cols+1);}const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(p,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));g.setIndex(idx);g.computeVertexNormals();const m=new THREE.Mesh(g,mat.cloth);m.castShadow=true;m.receiveShadow=true;group.add(m);sails.push({geometry:g,base,phase:x*2.7});
-    for(const u of [0,1]){let pts=[];for(let j=0;j<=rows;j++){const v=j/rows;pts.push(rotateSailPoint(x,[x+.035,top-height*v+.035*Math.sin(Math.PI*u)*v,(u-.5)*span*(1-.13*v)]));}path(pts,true);}
-    for(let j=0;j<cols;j++){let u=j/cols,nu=(j+1)/cols;line(rotateSailPoint(x,[x+.035+.105*Math.sin(Math.PI*u)*.368,top-height+.035*Math.sin(Math.PI*u),(u-.5)*span*.87]),rotateSailPoint(x,[x+.035+.105*Math.sin(Math.PI*nu)*.368,top-height+.035*Math.sin(Math.PI*nu),(nu-.5)*span*.87]),true);}
-    for(let z=-span*.32;z<=span*.33;z+=.12)line(rotateSailPoint(x,[x+.12,top-height*.65,z]),rotateSailPoint(x,[x+.12,top-height*.65-.026,z+.008]),true);return m;
+  function sail(x,top,height,span,material=mat.cloth){const sailFacing=material===mat.logoCloth?-1:1;const cols=16,rows=10,p=[],uv=[],idx=[],base=[];for(let j=0;j<=rows;j++)for(let i=0;i<=cols;i++){const u=i/cols,v=j/rows,z=(u-.5)*span*(1-.13*v),y=top-height*v+.035*Math.sin(Math.PI*u)*v,xx=x+sailFacing*(.035+.105*Math.sin(Math.PI*u)*Math.sin(Math.PI*v*.88));const pt=rotateSailPoint(x,[xx,y,z]);p.push(...pt);base.push(...pt,u,v);uv.push(u,1-v);}for(let j=0;j<rows;j++)for(let i=0;i<cols;i++){const a=j*(cols+1)+i;idx.push(a,a+1,a+cols+1,a+1,a+cols+2,a+cols+1);}const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(p,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));g.setIndex(idx);g.computeVertexNormals();const m=new THREE.Mesh(g,material);m.name=material===mat.logoCloth?'Soundplay.io mainsail':'Canvas sail';m.castShadow=true;m.receiveShadow=true;group.add(m);sails.push({geometry:g,base,phase:x*2.7});
+    for(const u of [0,1]){let pts=[];for(let j=0;j<=rows;j++){const v=j/rows;pts.push(rotateSailPoint(x,[x+sailFacing*.035,top-height*v+.035*Math.sin(Math.PI*u)*v,(u-.5)*span*(1-.13*v)]));}path(pts,true);}
+    for(let j=0;j<cols;j++){let u=j/cols,nu=(j+1)/cols;line(rotateSailPoint(x,[x+sailFacing*(.035+.105*Math.sin(Math.PI*u)*.368),top-height+.035*Math.sin(Math.PI*u),(u-.5)*span*.87]),rotateSailPoint(x,[x+sailFacing*(.035+.105*Math.sin(Math.PI*nu)*.368),top-height+.035*Math.sin(Math.PI*nu),(nu-.5)*span*.87]),true);}
+    for(let z=-span*.32;z<=span*.33;z+=.12)line(rotateSailPoint(x,[x+sailFacing*.12,top-height*.65,z]),rotateSailPoint(x,[x+sailFacing*.12,top-height*.65-.026,z+.008]),true);return m;
   }
   const masts=[{x:-1.00,h:1.48,w:.78},{x:-.10,h:1.91,w:1.04},{x:.83,h:1.66,w:.87}];
   masts.forEach((m,k)=>{spar('darkwood',[m.x,deckY(m.x),0],[m.x,m.h,0],.027,.010);for(const y of [.52,.79,m.h*.76])add(new THREE.CylinderGeometry(.031,.031,.018,10),'gold',[m.x,y,0]);const nestY=m.h*.72;add(new THREE.CylinderGeometry(.083,.065,.035,14),'wood',[m.x,nestY,0]);for(let j=0;j<8;j++){const a=j*Math.PI/4,px=m.x+Math.cos(a)*.077,pz=Math.sin(a)*.077;spar('gold',[px,nestY,pz],[px,nestY+.055,pz],.0035);}add(new THREE.TorusGeometry(.078,.004,5,16),'darkwood',[m.x,nestY+.057,0],[Math.PI/2,0,0]);
     const sections=k===0?[[m.h-.18,.29,m.w*.72],[m.h-.54,.36,m.w]]:[[m.h-.17,.28,m.w*.57],[m.h-.52,.34,m.w*.80],[m.h-.94,.41,m.w]];
-    sections.forEach(([top,height,span])=>{span*=1.10;spar('darkwood',rotateSailPoint(m.x,[m.x,top,-span*.56]),rotateSailPoint(m.x,[m.x,top,span*.56]),.011,.011);sail(m.x,top-.008,height,span);for(const sign of [-1,1]){line(rotateSailPoint(m.x,[m.x,top,sign*span*.55]),[m.x+.18,deckY(m.x)+.08,sign*.26]);line(rotateSailPoint(m.x,[m.x,top,sign*span*.54]),[m.x,m.h-.045,0]);add(new THREE.SphereGeometry(.016,6,5),'darkwood',[m.x+.18,deckY(m.x)+.08,sign*.26]);}});
+    sections.forEach(([top,height,span],sectionIndex)=>{span*=1.10;spar('darkwood',rotateSailPoint(m.x,[m.x,top,-span*.56]),rotateSailPoint(m.x,[m.x,top,span*.56]),.011,.011);sail(m.x,top-.008,height,span,k===1&&sectionIndex===2?mat.logoCloth:mat.cloth);for(const sign of [-1,1]){line(rotateSailPoint(m.x,[m.x,top,sign*span*.55]),[m.x+.18,deckY(m.x)+.08,sign*.26]);line(rotateSailPoint(m.x,[m.x,top,sign*span*.54]),[m.x,m.h-.045,0]);add(new THREE.SphereGeometry(.016,6,5),'darkwood',[m.x+.18,deckY(m.x)+.08,sign*.26]);}});
     for(const sign of [-1,1]){const baseY=deckY(m.x)+(m.x<-.8?.15:0),topY=nestY-.01,baseZ=sign*width(m.x)*.93;for(let j=-2;j<=2;j++)line([m.x+j*.095,baseY+.025,baseZ],[m.x,topY,sign*.027]);for(let j=1;j<15;j++){const t=j/15,yy=baseY+(topY-baseY)*t;line([m.x-.19*(1-t),yy,baseZ*(1-t)+sign*.027*t],[m.x+.19*(1-t),yy,baseZ*(1-t)+sign*.027*t]);}line([m.x,m.h,0],[Math.max(-1.63,m.x-.56),deckY(m.x)+.055,sign*.29]);line([m.x,m.h,0],[Math.min(1.7,m.x+.63),deckY(m.x)+.055,sign*.27]);}if(k<2)line([m.x,m.h,0],[masts[k+1].x,masts[k+1].h-.07,0]);
   });
   spar('darkwood',[1.26,.29,0],[2.17,.69,0],.024,.009);for(const z of [-.16,.16])line([1.48,.22,z],[2.16,.69,0]);line([2.17,.69,0],[.83,1.64,0]);line([2.14,.65,0],[.83,1.23,0]);
